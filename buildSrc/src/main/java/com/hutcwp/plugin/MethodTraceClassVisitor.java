@@ -15,6 +15,7 @@ public class MethodTraceClassVisitor extends ClassVisitor implements Opcodes {
     private boolean needHook = true;
 
     private String mClassName = "";
+    private boolean isABSClass = false;
 
 
     public MethodTraceClassVisitor(ClassVisitor classVisitor) {
@@ -25,15 +26,24 @@ public class MethodTraceClassVisitor extends ClassVisitor implements Opcodes {
     public void visit(int version, int access, String name, String signature, String superName, String[] interfaces) {
         super.visit(version, access, name, signature, superName, interfaces);
         this.mClassName = name;
+        if ((access & Opcodes.ACC_ABSTRACT) > 0 || (access & Opcodes.ACC_INTERFACE) > 0) {
+            this.isABSClass = true;
+        }
     }
+
 
     @Override
     public MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
-        MethodVisitor methodVisitor = super.visitMethod(access, name, descriptor, signature, exceptions);
+        if (isABSClass) {
+            return super.visitMethod(access, name, descriptor, signature, exceptions);
+        }
 
-        System.out.println("visitMethod: name=" + name);
+        MethodVisitor methodVisitor = super.visitMethod(access, name, descriptor, signature, exceptions);
+        String methodName = mClassName + "#" + name;
+        System.out.println("visitMethod: name=" + methodName);
         if (canHook(name)) {
-            return new TraceMethodVisitor(Opcodes.ASM7, access, descriptor, methodVisitor);
+            System.out.println("hook this");
+            return new TraceMethodVisitor(methodName, Opcodes.ASM7, access, descriptor, methodVisitor);
 //            return new TimeCostMethodVisitor(Opcodes.ASM7, access, descriptor, methodVisitor);
         }
 
