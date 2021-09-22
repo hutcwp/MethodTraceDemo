@@ -22,7 +22,7 @@ public class MethodTraceClassVisitor extends ClassVisitor implements Opcodes {
 
     @Override
     public AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
-        System.out.println("visitAnnotation, descriptor=" + descriptor);
+        MLog.debug("visitAnnotation, descriptor=" + descriptor);
         if (TRACE_ANNOTATION.equals(descriptor)) {
             hasTraceAnnotation = true;
         }
@@ -49,10 +49,10 @@ public class MethodTraceClassVisitor extends ClassVisitor implements Opcodes {
         MethodVisitor methodVisitor = super.visitMethod(access, name, descriptor, signature, exceptions);
         String methodName = mClassName + "#" + name;
         boolean canHook = canHook(name);
-        System.out.println(
+        MLog.debug(
             "visitMethod: name=" + methodName + " hook=" + canHook + " hasTraceAnnotation=" + hasTraceAnnotation);
         if (canHook) {
-            System.out.println("hook this");
+            MLog.debug("hook this method -> " + methodName);
             return new TraceMethodVisitor(methodName, Opcodes.ASM7, access, descriptor, methodVisitor);
 //            return new TimeCostMethodVisitor(Opcodes.ASM7, access, descriptor, methodVisitor);
         }

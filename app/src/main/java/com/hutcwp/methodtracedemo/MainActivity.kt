@@ -5,6 +5,7 @@ import android.os.Bundle
 import android.os.Trace
 import java.lang.Exception
 
+@com.example.sub.Trace
 class MainActivity : AppCompatActivity() {
 
     private var a = true

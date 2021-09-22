@@ -9,7 +9,7 @@ class MethodTracePlugin implements Plugin<Project> {
 
     @Override
     public void apply(Project project) {
-        System.out.println("MethodTracePlugin apply invoke!");
+        MLog.info("MethodTracePlugin apply invoke!");
         AppExtension android = project.getExtensions().findByType(AppExtension.class);
         android.registerTransform(new MethodTraceTransform(project));
     }
