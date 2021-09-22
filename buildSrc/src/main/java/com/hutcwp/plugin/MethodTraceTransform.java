@@ -5,6 +5,7 @@ import com.android.build.api.transform.DirectoryInput;
 import com.android.build.api.transform.Format;
 import com.android.build.api.transform.JarInput;
 import com.android.build.api.transform.QualifiedContent;
+import com.android.build.api.transform.QualifiedContent.Scope;
 import com.android.build.api.transform.Status;
 import com.android.build.api.transform.Transform;
 import com.android.build.api.transform.TransformInput;
@@ -13,6 +14,7 @@ import com.android.build.api.transform.TransformOutputProvider;
 import com.android.build.gradle.internal.pipeline.TransformManager;
 import com.android.utils.FileUtils;
 
+import com.google.common.collect.ImmutableSet;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.io.IOUtils;
 import org.gradle.api.Project;
@@ -38,9 +40,7 @@ import static org.objectweb.asm.ClassReader.EXPAND_FRAMES;
 
 
 /**
- * author : kevin
- * date : 2021/9/19 12:48 AM
- * description :
+ * author : kevin date : 2021/9/19 12:48 AM description :
  */
 public class MethodTraceTransform extends Transform {
 
@@ -62,7 +62,7 @@ public class MethodTraceTransform extends Transform {
 
     @Override
     public Set<? super QualifiedContent.Scope> getScopes() {
-        return TransformManager.SCOPE_FULL_PROJECT;
+        return ImmutableSet.of(Scope.PROJECT, Scope.SUB_PROJECTS);
     }
 
     @Override
@@ -113,14 +113,15 @@ public class MethodTraceTransform extends Transform {
         }
     }
 
-    private void handleDirectory(DirectoryInput directoryInput, TransformOutputProvider outputProvider) throws IOException {
+    private void handleDirectory(DirectoryInput directoryInput, TransformOutputProvider outputProvider)
+        throws IOException {
         System.out.println("handleDirectory");
         File srcDirFile = directoryInput.getFile();
         File destDir = outputProvider.getContentLocation(
-                directoryInput.getName(),
-                directoryInput.getContentTypes(),
-                directoryInput.getScopes(),
-                Format.DIRECTORY);
+            directoryInput.getName(),
+            directoryInput.getContentTypes(),
+            directoryInput.getScopes(),
+            Format.DIRECTORY);
 
 //        //是否是目录
         if (srcDirFile.isDirectory()) {
@@ -137,7 +138,7 @@ public class MethodTraceTransform extends Transform {
                     classReader.accept(methodTraceClassVisitor, EXPAND_FRAMES);
                     byte[] code = classWriter.toByteArray();
                     FileOutputStream fos = new FileOutputStream(
-                            file.getParentFile().getAbsoluteFile() + File.separator + name);
+                        file.getParentFile().getAbsoluteFile() + File.separator + name);
                     fos.write(code);
                     fos.close();
                 }
@@ -147,7 +148,8 @@ public class MethodTraceTransform extends Transform {
         FileUtils.copyDirectory(srcDirFile, destDir);
     }
 
-    private void handleDirectoryIncremental(DirectoryInput directoryInput, TransformOutputProvider outputProvider) throws IOException {
+    private void handleDirectoryIncremental(DirectoryInput directoryInput, TransformOutputProvider outputProvider)
+        throws IOException {
         //通过DirectoryInput的getChangedFiles方法获取改变过的文件集合，每一个文件对应一个Status
         Map<File, Status> changedFileMap = directoryInput.getChangedFiles();
         //遍历所有改变过的文件
@@ -177,6 +179,7 @@ public class MethodTraceTransform extends Transform {
         if (jarInput.getFile().getAbsolutePath().endsWith(".jar")) {
             //重名名输出文件,因为可能同名,会覆盖
             String jarName = jarInput.getName();
+            System.out.println("jarName=" + jarName + " path=" + jarInput.getFile().getAbsolutePath());
             String md5Name = DigestUtils.md5Hex(jarInput.getFile().getAbsolutePath());
             if (jarName.endsWith(".jar")) {
                 jarName = jarName.substring(0, jarName.length() - 4);
@@ -195,8 +198,9 @@ public class MethodTraceTransform extends Transform {
                 String entryName = jarEntry.getName();
                 ZipEntry zipEntry = new ZipEntry(entryName);
                 InputStream inputStream = jarFile.getInputStream(jarEntry);
+                System.out.println("class=" + entryName);
                 //需要插桩class 根据自己的需求来-------------
-                if ("androidx/fragment/app/FragmentActivity.class".equals(entryName)) {
+                if (isValidClass(entryName)) {
                     //class文件处理
                     System.out.println("----------- jar class  <" + entryName + "> -----------");
                     jarOutputStream.putNextEntry(zipEntry);
@@ -218,7 +222,7 @@ public class MethodTraceTransform extends Transform {
             jarFile.close();
             //获取output目录
             File dest = outputProvider.getContentLocation(jarName + md5Name,
-                    jarInput.getContentTypes(), jarInput.getScopes(), Format.JAR);
+                jarInput.getContentTypes(), jarInput.getScopes(), Format.JAR);
             FileUtils.copyFile(tmpFile, dest);
             tmpFile.delete();
         }
@@ -229,10 +233,10 @@ public class MethodTraceTransform extends Transform {
 
         File srcJarFile = jarInput.getFile();
         File destJarFile = outputProvider.getContentLocation(
-                jarInput.getName(),
-                jarInput.getContentTypes(),
-                jarInput.getScopes(),
-                Format.JAR
+            jarInput.getName(),
+            jarInput.getContentTypes(),
+            jarInput.getScopes(),
+            Format.JAR
         );
 
 //        FileUtils.copyFile(srcJarFile, destJarFile);
@@ -290,12 +294,14 @@ public class MethodTraceTransform extends Transform {
         }
     }
 
-    private boolean isValidClass(String name) {
+    private static boolean isValidClass(String name) {
         return name.endsWith(".class") && !name.equals("R.class")
-                && !name.startsWith("R\\$")
-                && !name.startsWith("<init>")
-                && !name.startsWith("<clinit>")
-                && !name.equals("BuildConfig.class");
+            && name.contains("MainActivity")
+            && name.contains("AubMainActivity")
+            && !name.startsWith("R\\$")
+            && !name.startsWith("<init>")
+            && !name.startsWith("<clinit>")
+            && !name.equals("BuildConfig.class");
     }
 
 }

@@ -1,25 +1,33 @@
 package com.hutcwp.plugin;
 
+import org.objectweb.asm.AnnotationVisitor;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 
 /**
- * author : kevin
- * date : 2021/9/19 3:46 AM
- * description :
+ * author : kevin date : 2021/9/19 3:46 AM description :
  */
 public class MethodTraceClassVisitor extends ClassVisitor implements Opcodes {
 
-
-    private boolean needHook = true;
-
     private String mClassName = "";
+    private boolean hasTraceAnnotation = false;
     private boolean isABSClass = false;
 
+    private static final String TRACE_ANNOTATION = "Lcom/example/sub/Trace;";
 
     public MethodTraceClassVisitor(ClassVisitor classVisitor) {
         super(Opcodes.ASM7, classVisitor);
+    }
+
+    @Override
+    public AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
+        System.out.println("visitAnnotation, descriptor=" + descriptor);
+        if (TRACE_ANNOTATION.equals(descriptor)) {
+            hasTraceAnnotation = true;
+        }
+
+        return super.visitAnnotation(descriptor, visible);
     }
 
     @Override
@@ -31,17 +39,19 @@ public class MethodTraceClassVisitor extends ClassVisitor implements Opcodes {
         }
     }
 
-
     @Override
-    public MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
+    public MethodVisitor visitMethod(int access, String name, String descriptor, String signature,
+        String[] exceptions) {
         if (isABSClass) {
             return super.visitMethod(access, name, descriptor, signature, exceptions);
         }
 
         MethodVisitor methodVisitor = super.visitMethod(access, name, descriptor, signature, exceptions);
         String methodName = mClassName + "#" + name;
-        System.out.println("visitMethod: name=" + methodName);
-        if (canHook(name)) {
+        boolean canHook = canHook(name);
+        System.out.println(
+            "visitMethod: name=" + methodName + " hook=" + canHook + " hasTraceAnnotation=" + hasTraceAnnotation);
+        if (canHook) {
             System.out.println("hook this");
             return new TraceMethodVisitor(methodName, Opcodes.ASM7, access, descriptor, methodVisitor);
 //            return new TimeCostMethodVisitor(Opcodes.ASM7, access, descriptor, methodVisitor);
@@ -51,9 +61,15 @@ public class MethodTraceClassVisitor extends ClassVisitor implements Opcodes {
     }
 
     private boolean canHook(String methodName) {
-        return needHook && isValidMethod(methodName);
+        return hasTraceAnnotation && isValidMethod(methodName);
     }
 
+    /**
+     * 过滤掉构造方法等
+     *
+     * @param methodName 方法名
+     * @return 是否合理
+     */
     private boolean isValidMethod(String methodName) {
         return !"<init>".equals(methodName);
     }
